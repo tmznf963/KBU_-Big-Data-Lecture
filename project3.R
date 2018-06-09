@@ -1,4 +1,5 @@
 getwd()
+setwd("C:/R_project")
 
 eq <- read.csv("Earthquake1.csv")
 
@@ -9,6 +10,7 @@ eq <- eq[, !names(eq) %in%
              "Horizontal.Error","Root.Mean.Square")]
 
 #결측치 제거
+install.packages("dplyr")
 library(dplyr)
 eq<- na.omit(eq)
 eq
@@ -128,8 +130,10 @@ library(Hmisc)
 str(eq)
 
 data = eq.train
-# Date + Time + Latitude + Longitude + Type + Depth
-summary(Magnitude.Type ~ Latitude + Longitude + Type + Depth, data = data, method = "reverse")
+# Date + Time + Latitude + Longitude + Type + Depth + Magnitude
+# Latitude + Longitude + Type + Depth, data
+
+summary(Magnitude.Type ~ Latitude + Longitude + Type + Depth +  Magnitude, data = data, method = "reverse")
 
 str(data)
 data = eq.train
@@ -170,21 +174,17 @@ xtabs(Magnitude.Type == "MWC" ~ Type + Magnitude,data=data)
 xtabs(Magnitude.Type == "MWR" ~ Type + Magnitude,data=data)
 xtabs(Magnitude.Type == "MWW" ~ Type + Magnitude,data=data)
 
-# 타입 크기별 크기타입("MB")일 확률
+# 타입,크기별 크기타입("MB")일 확률
 xtabs(Magnitude.Type == "MB" ~ Type + Magnitude,data=data) /
   + xtabs( ~ Type + Magnitude,data=data)
 
-# 평가 메트릭
-predicted <- c(1, 0, 0, 1, 1)
-actual <- c(1, 0, 0, 0, 0)
-sum( predicted == actual ) / NROW ( predicted )
 
 str(eq)
 #나무 모형 중 하나로 다양한 변수의 상호작용을 잘 표현
 #rpart는 이를 대리 변수(surrogate variable)로 처리
 library(rpart)
 m <- rpart(
-  Magnitude.Type ~ Latitude + Longitude + Type + Depth,
+  Magnitude.Type ~ Latitude + Longitude + Type + Depth + Magnitude,
   data=eq.train)
 p <- predict(m, newdata = eq.train, type="class")
 
@@ -199,7 +199,7 @@ library(foreach)
 folds <- create_ten_fold_cv()
 rpart_result <- foreach(f=folds) %do%{
   model_rpart <- rpart(#
-    Magnitude.Type ~ Latitude + Longitude + Type + Depth,
+    Magnitude.Type ~ Latitude + Longitude + Type + Depth + Magnitude,
     data=f$train)
   predicted <- predict(model_rpart, newdata = f$validation,#
                        type="class")
@@ -232,7 +232,7 @@ install.packages("party")
 library(party)
 ctree_result <- foreach(f=folds) %do%{
   model_ctree <- ctree(
-    Magnitude.Type ~ Latitude + Longitude + Type + Depth,
+    Magnitude.Type ~ Latitude + Longitude + Type + Depth + Magnitude,
     data=f$train)
   predicted <- predict(model_ctree, newdata=f$validation,
                        type="response")
@@ -260,11 +260,15 @@ View(eq.train[order(eq.train$Date),
 sum(is.na(eq.train$Date))
 
 Date_result <- foreach(f=folds) %do%{
-  Date_model_rpart <- rpart(#
-    Magnitude.Type ~ Date + Time + Type + Magnitude,
+  Date_model_ctree <- ctree(
+    Magnitude.Type ~ Type + Depth + Magnitude,
     data=f$train)
-  predicted <- predict(Date_model_rpart, newdata = f$validation,#
-                       type="class")
+  predicted <- predict(Date_model_ctree, newdata=f$validation,
+                       type="response")
   return(list(actual=f$validation$Magnitude.Type, predicted=predicted))
 }
 (Date_accuracy <-evaluation(Date_result))
+
+plot(density(rpart_accuracy), main = "rpart VS ctree")
+lines(density(ctree_accuracy),col="red", lty ="dashed")
+lines(density(Date_accuracy),col="blue", lty ="dashed")
