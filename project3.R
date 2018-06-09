@@ -149,7 +149,7 @@ featurePlot(
                        })],
   data.complete[, c("Magnitude.Type")],
   "ellipse"
-  )
+)
 
 #모자이크 플롯
 mosaicplot(Magnitude.Type ~ Magnitude + Type , data = data , color = TRUE,
@@ -190,30 +190,81 @@ p <- predict(m, newdata = eq.train, type="class")
 
 head(p)
 
+#교차 검증 데이터에 대해 예측값 구하기
 #10개 Fold에 대한 예측값과 실제값 데이터
 library(foreach)
 
+#actual에 지진 크기타입부의 실제값
+#predicted에 지진 크기타입의 예측값을 저장한 리스트로 반환
 folds <- create_ten_fold_cv()
 rpart_result <- foreach(f=folds) %do%{
-  model_rpart <- rpart(
+  model_rpart <- rpart(#
     Magnitude.Type ~ Latitude + Longitude + Type + Depth,
     data=f$train)
-  predicted <- predict(model_rpart, newdata = f$validation,
-                        type="class")
+  predicted <- predict(model_rpart, newdata = f$validation,#
+                       type="class")
   return(list(actual=f$validation$Magnitude.Type, predicted=predicted))
 }
 
 head(rpart_result)
 
 
+#Accuracy 계산함수
+#evaluation() = rpart result를 입력으로 받아 sapply() 수행
+#sapply는 각 fold에
+#대한 결과에 대해 Accuracy를 계산하며 이를 벡터 묶음
+#편의를 위해 평균과 표준편차를 계산한 뒤 
+#Accuracy의 벡터를 결과로 반환
 evaluation <- function(lst){
   accuracy <- sapply(lst, function(one_result){
     return(sum(one_result$predicted == one_result$actual)
            / NROW(one_result$actual))
   })
-  print(sprintf("MEAN +/- SD : %.3f +/- $.3f",
+  print(sprintf("MEAN +/- SD : %.3f +/- %.3f",
                 mean(accuracy),sd(accuracy)))
   return(accuracy)
 }
+(rpart_accuracy <-evaluation(rpart_result))
 
-evaluation(rpart_result)
+
+#다른 모델링 기법을 적용
+install.packages("party")
+library(party)
+ctree_result <- foreach(f=folds) %do%{
+  model_ctree <- ctree(
+    Magnitude.Type ~ Latitude + Longitude + Type + Depth,
+    data=f$train)
+  predicted <- predict(model_ctree, newdata=f$validation,
+                       type="response")
+  return(list(actual=f$validation$Magnitude.Type, predicted=predicted))
+}
+(ctree_accuracy <- evaluation(ctree_result))
+
+#Accuracy 벡터에서 밀도 그림(density)을 그려 정확도의
+#분포를 살펴볼 수도 있다.
+plot(density(rpart_accuracy), main = "rpart VS ctree")
+lines(density(ctree_accuracy),col="red", lty ="dashed")
+
+
+str(eq)
+#survived ∼ pclass + sex + age + sibsp + parch + fare + embarked 
+#ticket ", " parch ", " name ", " cabin ", " embarked ")])
+
+# 또 다른 특징(Feature)의 발견
+# 검증 데이터를 분리하지 않은
+# eq.train 을 Date 에 따라 정렬해 표시
+View(eq.train[order(eq.train$Date),
+              c("Date","Time","Type","Magnitude")])
+
+#NA인 행의 수를 확인하는 코드
+sum(is.na(eq.train$Date))
+
+Date_result <- foreach(f=folds) %do%{
+  Date_model_rpart <- rpart(#
+    Magnitude.Type ~ Date + Time + Type + Magnitude,
+    data=f$train)
+  predicted <- predict(Date_model_rpart, newdata = f$validation,#
+                       type="class")
+  return(list(actual=f$validation$Magnitude.Type, predicted=predicted))
+}
+(Date_accuracy <-evaluation(Date_result))
