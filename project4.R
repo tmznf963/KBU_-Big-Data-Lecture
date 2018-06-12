@@ -2,6 +2,7 @@ getwd()
 setwd("C:/R_project")
 
 eq <- read.csv("Earthquake1.csv")
+head(eq)
 
 #불필요 컬럼 삭제
 eq <- eq[, !names(eq) %in%
@@ -10,7 +11,7 @@ eq <- eq[, !names(eq) %in%
              "Horizontal.Error","Root.Mean.Square")]
 
 str(eq)
-
+head(eq)
 #결측치 제거
 install.packages("dplyr")
 library(dplyr)
@@ -135,7 +136,7 @@ data = eq.train
 # Date + Time + Latitude + Longitude + Type + Depth + Magnitude
 # Latitude + Longitude + Type + Depth + Magnitude
 
-summary(Magnitude.Type ~ Latitude , data = data, method = "reverse")
+summary(Magnitude.Type ~ Latitude + Longitude + Type + Depth + Magnitude , data = data, method = "reverse")
 
 str(data)
 data = eq.train
