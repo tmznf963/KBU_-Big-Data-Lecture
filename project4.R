@@ -73,6 +73,30 @@ test_idx <- createDataPartition(eq$Magnitude.Type, p=0.1)$Resample1
 eq.test <- eq[test_idx, ]
 eq.train <- eq[-test_idx, ]
 
+
+#의사결정나무의 형성
+install.packages("tree")
+library(tree)
+treemod <- tree(Magnitude.Type ~ Latitude + Longitude + Type + Depth + Magnitude , data=eq.train)
+treemod <- tree(Magnitude.Type ~ Type + Depth + Magnitude , data=eq.train)
+treemod <- tree(Magnitude.Type ~ Latitude + Longitude + Type  , data=eq.train)
+plot(treemod)
+text(treemod)
+
+cv.trees <- cv.tree(treemod, FUN = prune.misclass)
+plot(cv.trees)
+
+prune.trees <- prune.misclass(treemod, best =4)
+plot(prune.trees)
+text(prune.trees, pretty = 0)
+
+#예측하기 & 모델 평가
+install.packages("e1071")
+library(e1071)
+treepred <- predict(prune.trees, eq.test, type='class')
+confusionMatrix(treepred, eq.test$Magnitude.Type)
+
+
 #데이터 확인
 eq.test
 head(eq.test)
@@ -146,7 +170,7 @@ data
 #num 컬럼만 선택하여 X에 지정
 install.packages("ellipse")
 library(ellipse)
-
+str(eq)
 data.complete <- data[complete.cases(data),]
 featurePlot(
   data.complete[,
@@ -285,6 +309,8 @@ plot(density(rpart_accuracy), main = "rpart VS ctree")
 lines(density(ctree_accuracy),col="red", lty ="dashed")
 lines(density(Depth_accuracy),col="green", lty ="dashed")
 
+table(eq$Type)
+
 #eq$Latitude,eq$Longitude,eq$Depth,eq$Magnitude
 is.na(eq$Latitude)
 cor(eq$Latitude,eq$Longitude)
@@ -300,3 +326,5 @@ symnum(cor(eq.train[c("Latitude","Longitude","Depth","Magnitude")]))
 install.packages("corraram")
 library(corrgram)
 corrgram(cor(eq.train[c("Latitude","Longitude","Depth","Magnitude")]),type="corr",upper.panel = panel.conf)
+
+
